@@ -16,20 +16,18 @@
  */
 package org.keycloak.quickstart.storage.user;
 
+import jakarta.enterprise.event.Observes;
+import jakarta.enterprise.event.TransactionPhase;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.TypedQuery;
+import jakarta.transaction.Transactional;
 import org.jboss.logging.Logger;
 import org.keycloak.component.ComponentModel;
 import org.keycloak.connections.jpa.JpaConnectionProvider;
 import org.keycloak.credential.CredentialInput;
 import org.keycloak.credential.CredentialInputUpdater;
 import org.keycloak.credential.CredentialInputValidator;
-import org.keycloak.models.GroupModel;
-import org.keycloak.models.KeycloakSession;
-import org.keycloak.models.RealmModel;
-import org.keycloak.models.RoleModel;
-import org.keycloak.models.UserCredentialModel;
-import org.keycloak.models.UserModel;
+import org.keycloak.models.*;
 import org.keycloak.models.cache.CachedUserModel;
 import org.keycloak.models.cache.OnUserCache;
 import org.keycloak.models.credential.PasswordCredentialModel;
@@ -38,19 +36,17 @@ import org.keycloak.storage.UserStorageProvider;
 import org.keycloak.storage.user.UserLookupProvider;
 import org.keycloak.storage.user.UserQueryProvider;
 import org.keycloak.storage.user.UserRegistrationProvider;
+import org.springframework.security.crypto.bcrypt.BCrypt;
 
-import java.util.HashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
-import java.util.UUID;
+import java.sql.Timestamp;
+import java.util.*;
 import java.util.stream.Stream;
 
 /**
  * @author <a href="mailto:bill@burkecentral.com">Bill Burke</a>
  * @version $Revision: 1 $
  */
-public class MyUserStorageProvider implements UserStorageProvider,
+public class MySQLUserStorageProvider implements UserStorageProvider,
         UserLookupProvider,
         UserRegistrationProvider,
         UserQueryProvider,
@@ -58,18 +54,27 @@ public class MyUserStorageProvider implements UserStorageProvider,
         CredentialInputValidator,
         OnUserCache
 {
-    private static final Logger logger = Logger.getLogger(MyUserStorageProvider.class);
+    private static final Logger logger = Logger.getLogger(MySQLUserStorageProvider.class);
     public static final String PASSWORD_CACHE_KEY = UserAdapter.class.getName() + ".password";
-
-    protected EntityManager em;
 
     protected ComponentModel model;
     protected KeycloakSession session;
 
-    MyUserStorageProvider(KeycloakSession session, ComponentModel model) {
+    protected EntityManager externalEntityManager;
+    protected EntityManager keycloakEntityManager;
+
+    private String firstName;
+    private String lastName;
+
+    MySQLUserStorageProvider() {
+
+    }
+
+    MySQLUserStorageProvider(KeycloakSession session, ComponentModel model) {
         this.session = session;
         this.model = model;
-        em = session.getProvider(JpaConnectionProvider.class, "user-store").getEntityManager();
+        externalEntityManager = session.getProvider(JpaConnectionProvider.class, "custom-user-store").getEntityManager();
+        keycloakEntityManager = session.getProvider(JpaConnectionProvider.class, "keycloak-user-store").getEntityManager();
     }
 
     @Override
@@ -94,21 +99,24 @@ public class MyUserStorageProvider implements UserStorageProvider,
     @Override
     public UserModel getUserById(RealmModel realm, String id) {
         logger.info("getUserById: " + id);
-        String persistenceId = StorageId.externalId(id);
-        UserEntity entity = em.find(UserEntity.class, persistenceId);
+
+        UserEntity entity = getCurrentEntity(id);
         if (entity == null) {
             logger.info("could not find user by id: " + id);
             return null;
         }
+
         return new UserAdapter(session, realm, model, entity);
     }
 
     @Override
     public UserModel getUserByUsername(RealmModel realm, String username) {
         logger.info("getUserByUsername: " + username);
-        TypedQuery<UserEntity> query = em.createNamedQuery("getUserByUsername", UserEntity.class);
+
+        TypedQuery<UserEntity> query = externalEntityManager.createNamedQuery("getUserByUsername", UserEntity.class);
         query.setParameter("username", username);
         List<UserEntity> result = query.getResultList();
+
         if (result.isEmpty()) {
             logger.info("could not find username: " + username);
             return null;
@@ -119,38 +127,52 @@ public class MyUserStorageProvider implements UserStorageProvider,
 
     @Override
     public UserModel getUserByEmail(RealmModel realm, String email) {
-        TypedQuery<UserEntity> query = em.createNamedQuery("getUserByEmail", UserEntity.class);
+        TypedQuery<UserEntity> query = externalEntityManager.createNamedQuery("getUserByEmail", UserEntity.class);
         query.setParameter("email", email);
         List<UserEntity> result = query.getResultList();
+
         if (result.isEmpty()) return null;
+
         return new UserAdapter(session, realm, model, result.get(0));
     }
 
     @Override
     public UserModel addUser(RealmModel realm, String username) {
+        System.out.println("addUser");
+
         UserEntity entity = new UserEntity();
-        entity.setId(UUID.randomUUID().toString());
+
         entity.setUsername(username);
-        em.persist(entity);
-        logger.info("added user: " + username);
-        return new UserAdapter(session, realm, model, entity);
+        entity.setCreatedAt(new Timestamp(System.currentTimeMillis()));
+
+        UserAdapter userAdapter = new UserAdapter(session, realm, model, entity);
+
+        return userAdapter;
+    }
+
+    @Transactional(value = Transactional.TxType.MANDATORY)
+    public void onUserCreated(@Observes(during = TransactionPhase.BEFORE_COMPLETION) UserModel user) {
+        System.out.println("onUserCreated");
+
+
     }
 
     @Override
     public boolean removeUser(RealmModel realm, UserModel user) {
-        String persistenceId = StorageId.externalId(user.getId());
-        UserEntity entity = em.find(UserEntity.class, persistenceId);
+        UserEntity entity = getCurrentEntity(user.getId());
+
         if (entity == null) return false;
-        em.remove(entity);
+
+        externalEntityManager.remove(entity);
+
         return true;
     }
 
     @Override
     public void onCache(RealmModel realm, CachedUserModel user, UserModel delegate) {
         String password = ((UserAdapter)delegate).getPassword();
-        if (password != null) {
-            user.getCachedWith().put(PASSWORD_CACHE_KEY, password);
-        }
+
+        if (password != null) user.getCachedWith().put(PASSWORD_CACHE_KEY, password);
     }
 
     @Override
@@ -160,20 +182,23 @@ public class MyUserStorageProvider implements UserStorageProvider,
 
     @Override
     public boolean updateCredential(RealmModel realm, UserModel user, CredentialInput input) {
-        if (!supportsCredentialType(input.getType()) || !(input instanceof UserCredentialModel)) return false;
-        UserCredentialModel cred = (UserCredentialModel)input;
+        if (!supportsCredentialType(input.getType()) || !(input instanceof UserCredentialModel userCredentialModel)) return false;
         UserAdapter adapter = getUserAdapter(user);
-        adapter.setPassword(cred.getValue());
+
+        String algorithm = realm.getPasswordPolicy().getHashAlgorithm();
+        int iterations = realm.getPasswordPolicy().getHashIterations();
+
+        if (algorithm.equals("bcrypt")) {
+            String rawPassword = userCredentialModel.getValue();
+            adapter.setPassword(BCrypt.hashpw(rawPassword, BCrypt.gensalt(iterations)));
+        }
 
         return true;
     }
 
     public UserAdapter getUserAdapter(UserModel user) {
-        if (user instanceof CachedUserModel) {
-            return (UserAdapter)((CachedUserModel) user).getDelegateForUpdate();
-        } else {
-            return (UserAdapter) user;
-        }
+        if (user instanceof CachedUserModel) return (UserAdapter)((CachedUserModel) user).getDelegateForUpdate();
+        return (UserAdapter) user;
     }
 
     @Override
@@ -181,7 +206,6 @@ public class MyUserStorageProvider implements UserStorageProvider,
         if (!supportsCredentialType(credentialType)) return;
 
         getUserAdapter(user).setPassword(null);
-
     }
 
     @Override
@@ -190,9 +214,8 @@ public class MyUserStorageProvider implements UserStorageProvider,
             Set<String> set = new HashSet<>();
             set.add(PasswordCredentialModel.TYPE);
             return set.stream();
-        } else {
-            return Stream.empty();
         }
+        return Stream.empty();
     }
 
     @Override
@@ -201,43 +224,59 @@ public class MyUserStorageProvider implements UserStorageProvider,
     }
 
     @Override
-    public boolean isValid(RealmModel realm, UserModel user, CredentialInput input) {
-        if (!supportsCredentialType(input.getType()) || !(input instanceof UserCredentialModel)) return false;
-        UserCredentialModel cred = (UserCredentialModel)input;
-        String password = getPassword(user);
-        return password != null && password.equals(cred.getValue());
+    public boolean isValid(RealmModel realm, UserModel userModel, CredentialInput input) {
+        if (!supportsCredentialType(input.getType()) || !(input instanceof UserCredentialModel userCredentialModel)) return false;
+
+        if (input.getType().equals(PasswordCredentialModel.TYPE)) {
+            String rawPassword = userCredentialModel.getValue();
+            String hashedPassword = getCurrentEntity(userModel.getId()).getPassword();
+
+            return hashedPassword != null && BCrypt.checkpw(rawPassword, hashedPassword);
+        }
+
+        return false;
     }
 
     public String getPassword(UserModel user) {
         String password = null;
-        if (user instanceof CachedUserModel) {
+
+        if (user instanceof CachedUserModel)
             password = (String)((CachedUserModel)user).getCachedWith().get(PASSWORD_CACHE_KEY);
-        } else if (user instanceof UserAdapter) {
+        else if (user instanceof UserAdapter)
             password = ((UserAdapter)user).getPassword();
-        }
+
         return password;
     }
 
     @Override
     public int getUsersCount(RealmModel realm) {
-        Object count = em.createNamedQuery("getUserCount")
+        Object count = externalEntityManager.createNamedQuery("getUserCount")
                 .getSingleResult();
+
         return ((Number)count).intValue();
     }
 
     @Override
-    public Stream<UserModel> searchForUserStream(RealmModel realm, Map<String, String> params, Integer firstResult, Integer maxResults) {
+    public Stream<UserModel> searchForUserStream(RealmModel realm, Map<String, String> params, Integer pageNumber, Integer pageSize) {
+        logger.info("searchForUser");
+
         String search = params.get(UserModel.SEARCH);
-        TypedQuery<UserEntity> query = em.createNamedQuery("searchForUser", UserEntity.class);
-        query.setParameter("search", "%" + search.toLowerCase() + "%");
-        if (firstResult != null) {
-            query.setFirstResult(firstResult);
-        }
-        if (maxResults != null) {
-            query.setMaxResults(maxResults);
-        }
+        TypedQuery<UserEntity> query;
+
+        if (Objects.equals(search, "*"))
+            query = externalEntityManager.createNamedQuery("getAllUsers", UserEntity.class);
+        else
+            query = externalEntityManager.createNamedQuery("searchForUser", UserEntity.class)
+                    .setParameter("search", "%" + search.toLowerCase() + "%");
+
+        if (pageNumber != null)
+            query.setFirstResult(pageNumber);
+        if (pageSize != null)
+            query.setMaxResults(pageSize);
+
         return query.getResultStream().map(entity -> new UserAdapter(session, realm, model, entity));
     }
+
 
     @Override
     public Stream<UserModel> getGroupMembersStream(RealmModel realm, GroupModel group, Integer firstResult, Integer maxResults) {
@@ -247,5 +286,11 @@ public class MyUserStorageProvider implements UserStorageProvider,
     @Override
     public Stream<UserModel> searchForUserByUserAttributeStream(RealmModel realm, String attrName, String attrValue) {
         return Stream.empty();
+    }
+
+    private UserEntity getCurrentEntity(String id) {
+        String persistenceId = StorageId.externalId(id);
+
+        return externalEntityManager.find(UserEntity.class, persistenceId);
     }
 }

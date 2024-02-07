@@ -17,40 +17,91 @@
 package org.keycloak.quickstart.storage.user;
 
 
-import jakarta.persistence.Entity;
-import jakarta.persistence.Id;
-import jakarta.persistence.NamedQueries;
-import jakarta.persistence.NamedQuery;
+import jakarta.persistence.*;
+
+import java.sql.Timestamp;
 
 /**
  * @author <a href="mailto:bill@burkecentral.com">Bill Burke</a>
  * @version $Revision: 1 $
  */
 @NamedQueries({
-        @NamedQuery(name="getUserByUsername", query="select u from UserEntity u where u.username = :username"),
-        @NamedQuery(name="getUserByEmail", query="select u from UserEntity u where u.email = :email"),
+        @NamedQuery(name="getUserByUsername", query="select u from UserEntity u WHERE u.username = :username"),
+        @NamedQuery(name="getUserByEmail", query="select u from UserEntity u WHERE u.username = :email"),
         @NamedQuery(name="getUserCount", query="select count(u) from UserEntity u"),
         @NamedQuery(name="getAllUsers", query="select u from UserEntity u"),
-        @NamedQuery(name="searchForUser", query="select u from UserEntity u where " +
-                "( lower(u.username) like :search or u.email like :search ) order by u.username"),
+        @NamedQuery(name= "getLastSyncDate", query = "SELECT MAX(u.lastSyncDate) FROM UserEntity u"),
+        @NamedQuery(name= "getUsersChangedSince",
+                query = "SELECT u FROM UserEntity u WHERE u.lastModifiedDate > :lastSync "),
+        @NamedQuery(name="searchForUser", query="select u from UserEntity u WHERE " + "( lower(u.username) like :search or u.username like :search ) order by u.username"),
 })
 @Entity
+@Table(name = "User")
 public class UserEntity {
     @Id
-    private String id;
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @Column(name = "userId")
+    private Integer id;
 
+    @Column(name = "whenAdded")
+    private Timestamp createdAt;
 
+    @Column(name = "ts")
+    private Timestamp lastModifiedDate;
+
+    @Column(name = "last_sync_date")
+    private Timestamp lastSyncDate;
+
+    @Column(name = "userName")
     private String username;
-    private String email;
-    private String password;
-    private String phone;
 
-    public String getId() {
+    private String email;
+
+    private String firstName;
+
+    private String lastName;
+
+    @Column(name = "bCryptPassword")
+    private String password;
+
+    private String status;
+
+    @Column(name = "phoneMobile")
+    private String mobilePhone;
+
+    @Column(name = "phoneOffice")
+    private String officePhone;
+
+    public Integer getId() {
         return id;
     }
 
-    public void setId(String id) {
+    public void setId(Integer id) {
         this.id = id;
+    }
+
+    public Timestamp getCreatedAt() {
+        return createdAt;
+    }
+
+    public void setCreatedAt(Timestamp createdAt) {
+        this.createdAt = createdAt;
+    }
+
+    public Timestamp getLastModifiedDate() {
+        return lastModifiedDate;
+    }
+
+    public void setLastModifiedDate(Timestamp lastModifiedDate) {
+        this.lastModifiedDate = lastModifiedDate;
+    }
+
+    public Timestamp getLastSyncDate() {
+        return lastSyncDate;
+    }
+
+    public void setLastSyncDate(Timestamp lastSyncDate) {
+        this.lastSyncDate = lastSyncDate;
     }
 
     public String getUsername() {
@@ -69,6 +120,22 @@ public class UserEntity {
         this.email = email;
     }
 
+    public String getFirstName() {
+        return firstName;
+    }
+
+    public void setFirstName(String firstName) {
+        this.firstName = firstName;
+    }
+
+    public String getLastName() {
+        return lastName;
+    }
+
+    public void setLastName(String lastName) {
+        this.lastName = lastName;
+    }
+
     public String getPassword() {
         return password;
     }
@@ -77,11 +144,27 @@ public class UserEntity {
         this.password = password;
     }
 
-    public String getPhone() {
-        return phone;
+    public String getStatus() {
+        return status;
     }
 
-    public void setPhone(String phone) {
-        this.phone = phone;
+    public void setStatus(String status) {
+        this.status = status;
+    }
+
+    public String getMobilePhone() {
+        return mobilePhone;
+    }
+
+    public void setMobilePhone(String mobilePhone) {
+        this.mobilePhone = mobilePhone;
+    }
+
+    public String getOfficePhone() {
+        return officePhone;
+    }
+
+    public void setOfficePhone(String officePhone) {
+        this.officePhone = officePhone;
     }
 }

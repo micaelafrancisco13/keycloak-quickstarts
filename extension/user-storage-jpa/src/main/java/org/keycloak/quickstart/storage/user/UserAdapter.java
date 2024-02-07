@@ -21,9 +21,11 @@ import org.keycloak.common.util.MultivaluedHashMap;
 import org.keycloak.component.ComponentModel;
 import org.keycloak.models.KeycloakSession;
 import org.keycloak.models.RealmModel;
+import org.keycloak.quickstart.storage.user.others.UserAttributes;
 import org.keycloak.storage.StorageId;
 import org.keycloak.storage.adapter.AbstractUserAdapterFederatedStorage;
 
+import java.sql.Timestamp;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
@@ -35,42 +37,15 @@ import java.util.stream.Stream;
  */
 public class UserAdapter extends AbstractUserAdapterFederatedStorage {
     private static final Logger logger = Logger.getLogger(UserAdapter.class);
-    protected UserEntity entity;
+
+    protected UserEntity userEntity;
+
     protected String keycloakId;
 
-    public UserAdapter(KeycloakSession session, RealmModel realm, ComponentModel model, UserEntity entity) {
+    public UserAdapter(KeycloakSession session, RealmModel realm, ComponentModel model, UserEntity userEntity) {
         super(session, realm, model);
-        this.entity = entity;
-        keycloakId = StorageId.keycloakId(model, entity.getId());
-    }
-
-    public String getPassword() {
-        return entity.getPassword();
-    }
-
-    public void setPassword(String password) {
-        entity.setPassword(password);
-    }
-
-    @Override
-    public String getUsername() {
-        return entity.getUsername();
-    }
-
-    @Override
-    public void setUsername(String username) {
-        entity.setUsername(username);
-
-    }
-
-    @Override
-    public void setEmail(String email) {
-        entity.setEmail(email);
-    }
-
-    @Override
-    public String getEmail() {
-        return entity.getEmail();
+        this.userEntity = userEntity;
+        keycloakId = StorageId.keycloakId(model, String.valueOf(userEntity.getId()));
     }
 
     @Override
@@ -79,58 +54,155 @@ public class UserAdapter extends AbstractUserAdapterFederatedStorage {
     }
 
     @Override
+    public String getUsername() {
+        return userEntity.getUsername();
+    }
+
+    @Override
+    public void setUsername(String username) {
+        userEntity.setUsername(username);
+    }
+
+    @Override
+    public String getEmail() {
+        return userEntity.getEmail();
+    }
+
+    @Override
+    public void setEmail(String email) {
+        userEntity.setEmail(email);
+        super.setEmail(email);
+    }
+
+//    @Override
+//    public String getFirstName() {
+//        return userEntity.getFirstName();
+//    }
+//
+//    @Override
+//    public void setFirstName(String firstName) {
+//        userEntity.setFirstName(firstName);
+//        super.setFirstName(firstName);
+//    }
+//
+//    @Override
+//    public String getLastName() {
+//        return userEntity.getLastName();
+//    }
+//
+//    @Override
+//    public void setLastName(String lastName) {
+//        userEntity.setLastName(lastName);
+//        super.setLastName(lastName);
+//    }
+
+    public String getPassword() {
+        return userEntity.getPassword();
+    }
+
+    public void setPassword(String password) {
+        userEntity.setPassword(password);
+    }
+
+    @Override
+    public Long getCreatedTimestamp() {
+        return userEntity.getCreatedAt().getTime();
+    }
+
+    @Override
+    public void setCreatedTimestamp(Long timestamp) {
+        userEntity.setCreatedAt(new Timestamp(timestamp));
+    }
+
+    @Override
     public void setSingleAttribute(String name, String value) {
-        if (name.equals("phone")) {
-            entity.setPhone(value);
-        } else {
+        logger.info(" > > > setSingleAttribute");
+
+        if (name.equals(String.valueOf(UserAttributes.STATUS)))
+            userEntity.setStatus(value);
+        else if (name.equals(String.valueOf(UserAttributes.MOBILE_PHONE)))
+            userEntity.setMobilePhone(value);
+        else if (name.equals(String.valueOf(UserAttributes.OFFICE_PHONE)))
+            userEntity.setOfficePhone(value);
+        else
             super.setSingleAttribute(name, value);
-        }
     }
 
     @Override
     public void removeAttribute(String name) {
-        if (name.equals("phone")) {
-            entity.setPhone(null);
-        } else {
+        logger.info(" > > > removeAttribute");
+
+        if (name.equals(String.valueOf(UserAttributes.STATUS)))
+            userEntity.setStatus(null);
+        else if (name.equals(String.valueOf(UserAttributes.MOBILE_PHONE)))
+            userEntity.setMobilePhone(null);
+        else if (name.equals(String.valueOf(UserAttributes.OFFICE_PHONE)))
+            userEntity.setOfficePhone(null);
+        else
             super.removeAttribute(name);
-        }
     }
 
     @Override
     public void setAttribute(String name, List<String> values) {
-        if (name.equals("phone")) {
-            entity.setPhone(values.get(0));
-        } else {
+        logger.info(" > > > setAttribute");
+
+        if (name.equals(String.valueOf(UserAttributes.STATUS)))
+            userEntity.setStatus(values.get(0));
+        else if (name.equals(String.valueOf(UserAttributes.MOBILE_PHONE)))
+            userEntity.setMobilePhone(values.get(0));
+        else if (name.equals(String.valueOf(UserAttributes.OFFICE_PHONE)))
+            userEntity.setOfficePhone(values.get(0));
+        else
             super.setAttribute(name, values);
-        }
     }
 
     @Override
     public String getFirstAttribute(String name) {
-        if (name.equals("phone")) {
-            return entity.getPhone();
-        } else {
+        logger.info(" > > > getFirstAttribute");
+
+        if (name.equals(String.valueOf(UserAttributes.STATUS)))
+            return userEntity.getStatus();
+        else if (name.equals(String.valueOf(UserAttributes.MOBILE_PHONE)))
+            return userEntity.getMobilePhone();
+        else if (name.equals(String.valueOf(UserAttributes.OFFICE_PHONE)))
+            return userEntity.getOfficePhone();
+        else
             return super.getFirstAttribute(name);
-        }
     }
 
     @Override
     public Map<String, List<String>> getAttributes() {
+        logger.info(" > > > getAttributes");
+
         Map<String, List<String>> attrs = super.getAttributes();
+
         MultivaluedHashMap<String, String> all = new MultivaluedHashMap<>();
         all.putAll(attrs);
-        all.add("phone", entity.getPhone());
+
+        all.add(String.valueOf(UserAttributes.STATUS), userEntity.getStatus());
+        all.add(String.valueOf(UserAttributes.MOBILE_PHONE), userEntity.getMobilePhone());
+        all.add(String.valueOf(UserAttributes.OFFICE_PHONE), userEntity.getOfficePhone());
+
         return all;
     }
 
     @Override
     public Stream<String> getAttributeStream(String name) {
-        if (name.equals("phone")) {
+        logger.info(" > > > getAttributeStream");
+
+        if (name.equals(String.valueOf(UserAttributes.STATUS))) {
+            List<String> status = new LinkedList<>();
+            status.add(userEntity.getStatus());
+            return status.stream();
+        } else if (name.equals(String.valueOf(UserAttributes.MOBILE_PHONE))) {
             List<String> phone = new LinkedList<>();
-            phone.add(entity.getPhone());
+            phone.add(userEntity.getMobilePhone());
             return phone.stream();
-        } else {
+        } else if (name.equals(String.valueOf(UserAttributes.OFFICE_PHONE))) {
+            List<String> officePhone = new LinkedList<>();
+            officePhone.add(userEntity.getOfficePhone());
+            return officePhone.stream();
+        } else
             return super.getAttributeStream(name);
-        }
     }
 }

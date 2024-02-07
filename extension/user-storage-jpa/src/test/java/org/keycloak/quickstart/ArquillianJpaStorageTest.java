@@ -21,17 +21,13 @@ import jakarta.ws.rs.core.Response;
 import org.jboss.arquillian.drone.api.annotation.Drone;
 import org.jboss.arquillian.graphene.page.Page;
 import org.jboss.arquillian.junit.Arquillian;
-import org.junit.After;
-import org.junit.AfterClass;
-import org.junit.Before;
-import org.junit.BeforeClass;
-import org.junit.Test;
+import org.junit.*;
 import org.junit.runner.RunWith;
+import org.keycloak.quickstart.storage.user.MySQLUserStorageProviderFactory;
 import org.keycloak.representations.idm.ComponentRepresentation;
 import org.keycloak.representations.idm.UserRepresentation;
 import org.keycloak.test.FluentTestsHelper;
 import org.keycloak.test.page.LoginPage;
-import org.keycloak.quickstart.storage.user.MyExampleUserStorageProviderFactory;
 import org.openqa.selenium.WebDriver;
 
 import java.util.concurrent.TimeUnit;
@@ -106,9 +102,9 @@ public class ArquillianJpaStorageTest {
 
     private String addProvider() {
         ComponentRepresentation provider = new ComponentRepresentation();
-        provider.setProviderId(MyExampleUserStorageProviderFactory.PROVIDER_ID);
+        provider.setProviderId(MySQLUserStorageProviderFactory.PROVIDER_ID);
         provider.setProviderType(PROVIDER_TYPE);
-        provider.setName(MyExampleUserStorageProviderFactory.PROVIDER_ID);
+        provider.setName(MySQLUserStorageProviderFactory.PROVIDER_ID);
 
         Response response = testsHelper.getTestRealmResource().components().add(provider);
         assertEquals(201, response.getStatus());
