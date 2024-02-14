@@ -32,7 +32,7 @@ import java.sql.Timestamp;
         @NamedQuery(name="getAllUsers", query="select u from UserEntity u"),
         @NamedQuery(name= "getLastSyncDate", query = "SELECT MAX(u.lastSyncDate) FROM UserEntity u"),
         @NamedQuery(name= "getUsersChangedSince",
-                query = "SELECT u FROM UserEntity u WHERE u.lastModifiedDate > :lastSync "),
+                query = "SELECT u FROM UserEntity u WHERE u.lastModifiedDate >= :lastSync "),
         @NamedQuery(name="searchForUser", query="select u from UserEntity u WHERE " + "( lower(u.username) like :search or u.username like :search ) order by u.username"),
 })
 @Entity
@@ -72,6 +72,15 @@ public class UserEntity {
     @Column(name = "phoneOffice")
     private String officePhone;
 
+    @Column(name = "password")
+    private String nonNullPassword;
+
+    private int companyId;
+
+    private short partnerId;
+
+    private int whoAdded;
+
     public Integer getId() {
         return id;
     }
@@ -101,6 +110,7 @@ public class UserEntity {
     }
 
     public void setLastSyncDate(Timestamp lastSyncDate) {
+        System.out.println("lastSyncDate " + lastSyncDate);
         this.lastSyncDate = lastSyncDate;
     }
 
@@ -166,5 +176,37 @@ public class UserEntity {
 
     public void setOfficePhone(String officePhone) {
         this.officePhone = officePhone;
+    }
+
+    public String getNonNullPassword() {
+        return nonNullPassword;
+    }
+
+    public void setNonNullPassword(String nonNullPassword) {
+        this.nonNullPassword = nonNullPassword;
+    }
+
+    public int getCompanyId() {
+        return companyId;
+    }
+
+    public void setCompanyId(int companyId) {
+        this.companyId = companyId;
+    }
+
+    public short getPartnerId() {
+        return partnerId;
+    }
+
+    public void setPartnerId(short partnerId) {
+        this.partnerId = partnerId;
+    }
+
+    public int getWhoAdded() {
+        return whoAdded;
+    }
+
+    public void setWhoAdded(int whoAdded) {
+        this.whoAdded = whoAdded;
     }
 }

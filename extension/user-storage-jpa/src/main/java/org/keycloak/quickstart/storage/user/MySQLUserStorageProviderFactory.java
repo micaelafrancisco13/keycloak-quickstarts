@@ -16,7 +16,6 @@
  */
 package org.keycloak.quickstart.storage.user;
 
-import jakarta.enterprise.event.Event;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.TypedQuery;
 import org.jboss.logging.Logger;
@@ -29,8 +28,8 @@ import org.keycloak.models.RealmModel;
 import org.keycloak.models.UserModel;
 import org.keycloak.models.utils.KeycloakModelUtils;
 import org.keycloak.provider.ProviderConfigProperty;
-import org.keycloak.quickstart.storage.user.others.ConfigProperties;
-import org.keycloak.quickstart.storage.user.others.UserAttributes;
+import org.keycloak.quickstart.storage.user.enums.ConfigProperties;
+import org.keycloak.quickstart.storage.user.enums.UserAttributes;
 import org.keycloak.storage.UserStorageProviderFactory;
 import org.keycloak.storage.UserStorageProviderModel;
 import org.keycloak.storage.user.ImportSynchronization;
@@ -39,6 +38,8 @@ import org.keycloak.storage.user.SynchronizationResult;
 import java.sql.Timestamp;
 import java.time.Duration;
 import java.time.Instant;
+import java.time.ZoneOffset;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
@@ -57,6 +58,8 @@ public class MySQLUserStorageProviderFactory implements UserStorageProviderFacto
     private int pageSize = 0;
 
     private int pageNumber = 0;
+
+    private int userCount = 0;
 
     @Override
     public MySQLUserStorageProvider create(KeycloakSession session, ComponentModel model) {
@@ -114,15 +117,12 @@ public class MySQLUserStorageProviderFactory implements UserStorageProviderFacto
         } catch (NumberFormatException e) {
             logger.info("Error: Number of users to sync is not a valid integer.");
         }
-
-        logger.info("A D M I N  C O N S O L E");
-        logger.info("NUMBER OF USERS TO SYNC" + " " + numberOfUsersToSync);
     }
 
     // called every n seconds, such that n is the value of the "Full sync period" settings
     @Override
     public SynchronizationResult sync(KeycloakSessionFactory keycloakSessionFactory, String realmId, UserStorageProviderModel userStorageProviderModel) {
-        logger.info("- - - - - S Y N C()");
+        System.out.println("- - - - - S Y N C()");
         Instant start = Instant.now();
 
         SynchronizationResult result = new SynchronizationResult();
@@ -134,14 +134,18 @@ public class MySQLUserStorageProviderFactory implements UserStorageProviderFacto
                     .setFirstResult(0)
                     .setMaxResults(pageSize);
 
+            var count = externalEntityManager.createNamedQuery("getUserCount")
+                    .getSingleResult();
+            userCount = ((Number)count).intValue();
+
             iterateByChunks(keycloakSessionFactory, realmId, result, query);
         });
 
         Instant finish = Instant.now();
         long totalElapsedTime = Duration.between(start, finish).getSeconds();
 
-        logger.info(" > > > T O T A L E L A P S E D T I M E" + " " + totalElapsedTime);
-        logger.info("- - - - - D O N E S Y N C");
+//        System.out.println(" > > > T O T A L E L A P S E D T I M E" + " " + totalElapsedTime);
+        System.out.println("- - - - - D O N E S Y N C");
 
         return result;
     }
@@ -149,7 +153,7 @@ public class MySQLUserStorageProviderFactory implements UserStorageProviderFacto
     // called every n seconds, such that n is the value of the "Changed users sync period" settings
     @Override
     public SynchronizationResult syncSince(Date date, KeycloakSessionFactory keycloakSessionFactory, String realmId, UserStorageProviderModel userStorageProviderModel) {
-        logger.info("- - - - - S Y N C S I N C E()");
+        System.out.println("- - - - - S Y N C S I N C E()");
         Instant start = Instant.now();
 
         SynchronizationResult result = new SynchronizationResult();
@@ -161,7 +165,7 @@ public class MySQLUserStorageProviderFactory implements UserStorageProviderFacto
                 lastSync = externalEntityManager
                         .createNamedQuery("getLastSyncDate", Timestamp.class)
                         .getSingleResult();
-                logger.info(" > > > last sync date" + " " + lastSync);
+                System.out.println("last sync date" + " " + lastSync);
 
                 var query = externalEntityManager.createNamedQuery("getUsersChangedSince", UserEntity.class)
                         .setParameter("lastSync", lastSync)
@@ -178,8 +182,8 @@ public class MySQLUserStorageProviderFactory implements UserStorageProviderFacto
         Instant finish = Instant.now();
         long totalElapsedTime = Duration.between(start, finish).getSeconds();
 
-        logger.info(" > > > T O T A L E L A P S E D T I M E" + " " + totalElapsedTime);
-        logger.info("- - - - - D O N E S Y N C S I N C E");
+//        System.out.println(" > > > T O T A L E L A P S E D T I M E" + " " + totalElapsedTime);
+        System.out.println("- - - - - D O N E S Y N C S I N C E");
 
         return result;
     }
@@ -187,23 +191,36 @@ public class MySQLUserStorageProviderFactory implements UserStorageProviderFacto
     private void iterateByChunks(KeycloakSessionFactory keycloakSessionFactory, String realmId, SynchronizationResult result, TypedQuery<UserEntity> query) {
         List<UserEntity> users = query.getResultList();
 
-        logger.info(" > > > users.size()" + " " + users.size());
+        if (!users.isEmpty()) System.out.println("number of users to sync " + users.size());
 
         while(!users.isEmpty()) {
             Instant start = Instant.now();
 
             modifyUsers(keycloakSessionFactory, realmId, users, result);
 
-            pageNumber++;
+            System.out.println("userCount " + userCount);
+            System.out.println("last sync date" + " " + lastSync);
+            System.out.println(' ');
+            System.out.println("last pageNumber");
+            System.out.println("pageNumber " + pageNumber);
+            System.out.println("pageNumber * pageSize " + pageNumber * pageSize);
+
+            ++pageNumber;
+
+            System.out.println("current pageNumber");
+            System.out.println("pageNumber " + pageNumber);
+            System.out.println("pageNumber * pageSize " + pageNumber * pageSize);
+
             query.setFirstResult(pageNumber * pageSize);
             users = query.getResultList();
 
             Instant finish = Instant.now();
             long timeElapsed = Duration.between(start, finish).getSeconds();
 
-            logger.info(" > > > N E X T B A T C H");
-            logger.info(" > > > T I M E I N S E C" + " " + timeElapsed);
+            System.out.println(" > > > N E X T B A T C H");
+            System.out.println(" > > > T I M E I N S E C" + " " + timeElapsed);
         }
+        pageNumber = 0;
     }
 
     private void modifyUsers(KeycloakSessionFactory keycloakSessionFactory, String realmId, List<UserEntity> users, SynchronizationResult result) {
@@ -230,9 +247,13 @@ public class MySQLUserStorageProviderFactory implements UserStorageProviderFacto
                 if (userEntity.getOfficePhone() != null && !userEntity.getOfficePhone().isEmpty() && !userEntity.getOfficePhone().isBlank())
                     userModel.setSingleAttribute(String.valueOf(UserAttributes.OFFICE_PHONE), userEntity.getOfficePhone());
 
-                userEntity.setLastSyncDate(new Timestamp(System.currentTimeMillis()));
+                DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss.SSSSSS");
+                String formattedUtcDateTime = Instant.now().atZone(ZoneOffset.UTC).format(formatter);
+                Timestamp timestampUtc = Timestamp.valueOf(formattedUtcDateTime);
+                System.out.println("timestampUtc" + " " + timestampUtc);
+                userEntity.setLastSyncDate(timestampUtc);
 
-                logger.info("> > > S Y N C E D" + " " + userEntity.getUsername());
+                System.out.println("> > > S Y N C E D" + " " + userEntity.getUsername());
             });
         }
     }

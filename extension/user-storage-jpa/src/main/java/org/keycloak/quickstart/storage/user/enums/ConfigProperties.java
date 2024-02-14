@@ -1,4 +1,4 @@
-package org.keycloak.quickstart.storage.user.others;
+package org.keycloak.quickstart.storage.user.enums;
 
 public enum ConfigProperties {
     NUMBER_OF_USERS_TO_SYNC,

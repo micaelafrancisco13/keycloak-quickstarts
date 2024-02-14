@@ -39,6 +39,9 @@ import org.keycloak.storage.user.UserRegistrationProvider;
 import org.springframework.security.crypto.bcrypt.BCrypt;
 
 import java.sql.Timestamp;
+import java.time.Instant;
+import java.time.ZoneOffset;
+import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.stream.Stream;
 
@@ -61,6 +64,7 @@ public class MySQLUserStorageProvider implements UserStorageProvider,
     protected KeycloakSession session;
 
     protected EntityManager externalEntityManager;
+    protected EntityManager testExternalEntityManager;
     protected EntityManager keycloakEntityManager;
 
     private String firstName;
@@ -74,6 +78,7 @@ public class MySQLUserStorageProvider implements UserStorageProvider,
         this.session = session;
         this.model = model;
         externalEntityManager = session.getProvider(JpaConnectionProvider.class, "custom-user-store").getEntityManager();
+        testExternalEntityManager = session.getProvider(JpaConnectionProvider.class, "custom-user-store-test").getEntityManager();
         keycloakEntityManager = session.getProvider(JpaConnectionProvider.class, "keycloak-user-store").getEntityManager();
     }
 
@@ -140,20 +145,35 @@ public class MySQLUserStorageProvider implements UserStorageProvider,
     public UserModel addUser(RealmModel realm, String username) {
         System.out.println("addUser");
 
-        UserEntity entity = new UserEntity();
+        DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss.SSSSSS");
+        String formattedUtcDateTime = Instant.now().atZone(ZoneOffset.UTC).format(formatter);
+        Timestamp timestampUtc = Timestamp.valueOf(formattedUtcDateTime);
 
-        entity.setUsername(username);
-        entity.setCreatedAt(new Timestamp(System.currentTimeMillis()));
+        UserEntity userEntity = new UserEntity();
 
-        UserAdapter userAdapter = new UserAdapter(session, realm, model, entity);
+        userEntity.setUsername(username);
+        userEntity.setEmail(username);
+        userEntity.setCreatedAt(timestampUtc);
+        userEntity.setNonNullPassword("");
+        userEntity.setCompanyId(18);
+        userEntity.setPartnerId((short) 1);
+        userEntity.setWhoAdded(1);
 
+        externalEntityManager.persist(userEntity);
+        UserModel userAdapter = new UserAdapter(session, realm, model, userEntity);
+//        jakarta.enterprise.inject.spi.CDI.current().getBeanManager().getEvent().fire(userAdapter);
+
+        UserEntity currentUserEntity = getCurrentEntity(userAdapter.getId());
+        System.out.println("userAdapter.getId() " + userAdapter.getId());
+        System.out.println("persisted user entity's first name " + currentUserEntity.getFirstName());
+
+        System.out.println("before returning");
         return userAdapter;
     }
 
     @Transactional(value = Transactional.TxType.MANDATORY)
     public void onUserCreated(@Observes(during = TransactionPhase.BEFORE_COMPLETION) UserModel user) {
         System.out.println("onUserCreated");
-
 
     }
 
@@ -185,15 +205,19 @@ public class MySQLUserStorageProvider implements UserStorageProvider,
         if (!supportsCredentialType(input.getType()) || !(input instanceof UserCredentialModel userCredentialModel)) return false;
         UserAdapter adapter = getUserAdapter(user);
 
+        adapter.setPassword(hashPassword(realm, userCredentialModel.getValue()));
+
+        return true;
+    }
+
+    private String hashPassword(RealmModel realm, String password) {
         String algorithm = realm.getPasswordPolicy().getHashAlgorithm();
         int iterations = realm.getPasswordPolicy().getHashIterations();
 
-        if (algorithm.equals("bcrypt")) {
-            String rawPassword = userCredentialModel.getValue();
-            adapter.setPassword(BCrypt.hashpw(rawPassword, BCrypt.gensalt(iterations)));
-        }
+        if (algorithm.equals("bcrypt"))
+            return BCrypt.hashpw(password, BCrypt.gensalt(iterations));
 
-        return true;
+        return "";
     }
 
     public UserAdapter getUserAdapter(UserModel user) {
@@ -292,5 +316,11 @@ public class MySQLUserStorageProvider implements UserStorageProvider,
         String persistenceId = StorageId.externalId(id);
 
         return externalEntityManager.find(UserEntity.class, persistenceId);
+    }
+
+    private UserEntityTest getCurrentEntityTest(String id) {
+        String persistenceId = StorageId.externalId(id);
+
+        return testExternalEntityManager.find(UserEntityTest.class, persistenceId);
     }
 }
