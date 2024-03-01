@@ -78,7 +78,6 @@ public class MySQLUserStorageProvider implements UserStorageProvider,
         this.session = session;
         this.model = model;
         externalEntityManager = session.getProvider(JpaConnectionProvider.class, "custom-user-store").getEntityManager();
-        testExternalEntityManager = session.getProvider(JpaConnectionProvider.class, "custom-user-store-test").getEntityManager();
         keycloakEntityManager = session.getProvider(JpaConnectionProvider.class, "keycloak-user-store").getEntityManager();
     }
 
@@ -316,11 +315,5 @@ public class MySQLUserStorageProvider implements UserStorageProvider,
         String persistenceId = StorageId.externalId(id);
 
         return externalEntityManager.find(UserEntity.class, persistenceId);
-    }
-
-    private UserEntityTest getCurrentEntityTest(String id) {
-        String persistenceId = StorageId.externalId(id);
-
-        return testExternalEntityManager.find(UserEntityTest.class, persistenceId);
     }
 }

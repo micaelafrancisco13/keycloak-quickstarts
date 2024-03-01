@@ -40,20 +40,12 @@ public class UserAdapter extends AbstractUserAdapterFederatedStorage {
 
     protected UserEntity userEntity;
 
-    protected UserEntityTest userEntityTest;
-
     protected String keycloakId;
 
     public UserAdapter(KeycloakSession session, RealmModel realm, ComponentModel model, UserEntity userEntity) {
         super(session, realm, model);
         this.userEntity = userEntity;
         keycloakId = StorageId.keycloakId(model, String.valueOf(userEntity.getId()));
-    }
-
-    public UserAdapter(KeycloakSession session, RealmModel realm, ComponentModel model, UserEntityTest userEntityTest) {
-        super(session, realm, model);
-        this.userEntityTest = userEntityTest;
-        keycloakId = StorageId.keycloakId(model, String.valueOf(userEntityTest.getId()));
     }
 
     @Override
