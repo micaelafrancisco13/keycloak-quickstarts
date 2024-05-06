@@ -284,13 +284,11 @@ public class MySQLUserStorageProvider implements UserStorageProvider,
         logger.info("searchForUser");
 
         String search = params.get(UserModel.SEARCH);
-        TypedQuery<UserEntity> query;
+        TypedQuery<UserEntity> query = externalEntityManager.createNamedQuery("searchForUser", UserEntity.class)
+                .setParameter("search", "%" + search.toLowerCase() + "%");
 
         if (Objects.equals(search, "*"))
             query = externalEntityManager.createNamedQuery("getAllUsers", UserEntity.class);
-        else
-            query = externalEntityManager.createNamedQuery("searchForUser", UserEntity.class)
-                    .setParameter("search", "%" + search.toLowerCase() + "%");
 
         if (pageNumber != null)
             query.setFirstResult(pageNumber);
