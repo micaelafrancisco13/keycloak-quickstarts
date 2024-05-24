@@ -102,8 +102,6 @@ public class MySQLUserStorageProvider implements UserStorageProvider,
 
     @Override
     public UserModel getUserById(RealmModel realm, String id) {
-        logger.info("getUserById: " + id);
-
         UserEntity entity = getCurrentEntity(id);
         if (entity == null) {
             logger.info("could not find user by id: " + id);
@@ -115,8 +113,6 @@ public class MySQLUserStorageProvider implements UserStorageProvider,
 
     @Override
     public UserModel getUserByUsername(RealmModel realm, String username) {
-        logger.info("getUserByUsername: " + username);
-
         TypedQuery<UserEntity> query = externalEntityManager.createNamedQuery("getUserByUsername", UserEntity.class);
         query.setParameter("username", username);
         List<UserEntity> result = query.getResultList();
@@ -173,7 +169,6 @@ public class MySQLUserStorageProvider implements UserStorageProvider,
     @Transactional(value = Transactional.TxType.MANDATORY)
     public void onUserCreated(@Observes(during = TransactionPhase.BEFORE_COMPLETION) UserModel user) {
         System.out.println("onUserCreated");
-
     }
 
     @Override
@@ -281,8 +276,6 @@ public class MySQLUserStorageProvider implements UserStorageProvider,
 
     @Override
     public Stream<UserModel> searchForUserStream(RealmModel realm, Map<String, String> params, Integer pageNumber, Integer pageSize) {
-        logger.info("searchForUser");
-
         String search = params.get(UserModel.SEARCH);
         TypedQuery<UserEntity> query = externalEntityManager.createNamedQuery("searchForUser", UserEntity.class)
                 .setParameter("search", "%" + search.toLowerCase() + "%");
