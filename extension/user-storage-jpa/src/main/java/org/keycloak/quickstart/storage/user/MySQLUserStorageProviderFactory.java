@@ -122,9 +122,6 @@ public class MySQLUserStorageProviderFactory implements UserStorageProviderFacto
     // called every n seconds, such that n is the value of the "Full sync period" settings
     @Override
     public SynchronizationResult sync(KeycloakSessionFactory keycloakSessionFactory, String realmId, UserStorageProviderModel userStorageProviderModel) {
-        System.out.println("- - - - - S Y N C()");
-        Instant start = Instant.now();
-
         SynchronizationResult result = new SynchronizationResult();
 
         KeycloakModelUtils.runJobInTransaction(keycloakSessionFactory, session -> {
@@ -141,21 +138,12 @@ public class MySQLUserStorageProviderFactory implements UserStorageProviderFacto
             iterateByChunks(keycloakSessionFactory, realmId, result, query);
         });
 
-        Instant finish = Instant.now();
-        long totalElapsedTime = Duration.between(start, finish).getSeconds();
-
-//        System.out.println(" > > > T O T A L E L A P S E D T I M E" + " " + totalElapsedTime);
-        System.out.println("- - - - - D O N E S Y N C");
-
         return result;
     }
 
     // called every n seconds, such that n is the value of the "Changed users sync period" settings
     @Override
     public SynchronizationResult syncSince(Date date, KeycloakSessionFactory keycloakSessionFactory, String realmId, UserStorageProviderModel userStorageProviderModel) {
-        System.out.println("- - - - - S Y N C S I N C E()");
-        Instant start = Instant.now();
-
         SynchronizationResult result = new SynchronizationResult();
 
         try {
@@ -165,7 +153,6 @@ public class MySQLUserStorageProviderFactory implements UserStorageProviderFacto
                 lastSync = externalEntityManager
                         .createNamedQuery("getLastSyncDate", Timestamp.class)
                         .getSingleResult();
-                System.out.println("last sync date" + " " + lastSync);
 
                 var query = externalEntityManager.createNamedQuery("getUsersChangedSince", UserEntity.class)
                         .setParameter("lastSync", lastSync)
@@ -179,46 +166,19 @@ public class MySQLUserStorageProviderFactory implements UserStorageProviderFacto
             throw e;
         }
 
-        Instant finish = Instant.now();
-        long totalElapsedTime = Duration.between(start, finish).getSeconds();
-
-//        System.out.println(" > > > T O T A L E L A P S E D T I M E" + " " + totalElapsedTime);
-        System.out.println("- - - - - D O N E S Y N C S I N C E");
-
         return result;
     }
 
     private void iterateByChunks(KeycloakSessionFactory keycloakSessionFactory, String realmId, SynchronizationResult result, TypedQuery<UserEntity> query) {
         List<UserEntity> users = query.getResultList();
 
-        if (!users.isEmpty()) System.out.println("number of users to sync " + users.size());
-
         while(!users.isEmpty()) {
-            Instant start = Instant.now();
-
             modifyUsers(keycloakSessionFactory, realmId, users, result);
-
-            System.out.println("userCount " + userCount);
-            System.out.println("last sync date" + " " + lastSync);
-            System.out.println(' ');
-            System.out.println("last pageNumber");
-            System.out.println("pageNumber " + pageNumber);
-            System.out.println("pageNumber * pageSize " + pageNumber * pageSize);
 
             ++pageNumber;
 
-            System.out.println("current pageNumber");
-            System.out.println("pageNumber " + pageNumber);
-            System.out.println("pageNumber * pageSize " + pageNumber * pageSize);
-
             query.setFirstResult(pageNumber * pageSize);
             users = query.getResultList();
-
-            Instant finish = Instant.now();
-            long timeElapsed = Duration.between(start, finish).getSeconds();
-
-            System.out.println(" > > > N E X T B A T C H");
-            System.out.println(" > > > T I M E I N S E C" + " " + timeElapsed);
         }
         pageNumber = 0;
     }
@@ -250,10 +210,7 @@ public class MySQLUserStorageProviderFactory implements UserStorageProviderFacto
                 DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss.SSSSSS");
                 String formattedUtcDateTime = Instant.now().atZone(ZoneOffset.UTC).format(formatter);
                 Timestamp timestampUtc = Timestamp.valueOf(formattedUtcDateTime);
-                System.out.println("timestampUtc" + " " + timestampUtc);
                 userEntity.setLastSyncDate(timestampUtc);
-
-                System.out.println("> > > S Y N C E D" + " " + userEntity.getUsername());
             });
         }
     }

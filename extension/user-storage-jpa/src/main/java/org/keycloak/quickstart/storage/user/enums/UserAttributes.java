@@ -1,6 +1,7 @@
 package org.keycloak.quickstart.storage.user.enums;
 
 public enum UserAttributes {
+    OLD_USER_ID,
     STATUS,
     MOBILE_PHONE,
     OFFICE_PHONE,

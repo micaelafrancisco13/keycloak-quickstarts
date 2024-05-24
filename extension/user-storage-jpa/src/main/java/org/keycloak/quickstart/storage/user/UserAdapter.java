@@ -116,7 +116,7 @@ public class UserAdapter extends AbstractUserAdapterFederatedStorage {
 
     @Override
     public void setSingleAttribute(String name, String value) {
-        logger.info(" > > > setSingleAttribute");
+//        logger.info(" > > > setSingleAttribute");
 
         if (name.equals(String.valueOf(UserAttributes.STATUS)))
             userEntity.setStatus(value);
@@ -130,7 +130,7 @@ public class UserAdapter extends AbstractUserAdapterFederatedStorage {
 
     @Override
     public void removeAttribute(String name) {
-        logger.info(" > > > removeAttribute");
+//        logger.info(" > > > removeAttribute");
 
         if (name.equals(String.valueOf(UserAttributes.STATUS)))
             userEntity.setStatus(null);
@@ -144,7 +144,7 @@ public class UserAdapter extends AbstractUserAdapterFederatedStorage {
 
     @Override
     public void setAttribute(String name, List<String> values) {
-        logger.info(" > > > setAttribute");
+//        logger.info(" > > > setAttribute");
 
         if (name.equals(String.valueOf(UserAttributes.STATUS)))
             userEntity.setStatus(values.get(0));
@@ -158,9 +158,11 @@ public class UserAdapter extends AbstractUserAdapterFederatedStorage {
 
     @Override
     public String getFirstAttribute(String name) {
-        logger.info(" > > > getFirstAttribute");
+//        logger.info(" > > > getFirstAttribute");
 
-        if (name.equals(String.valueOf(UserAttributes.STATUS)))
+        if (name.equals(String.valueOf(UserAttributes.OLD_USER_ID)))
+            return String.valueOf(userEntity.getId());
+        else if (name.equals(String.valueOf(UserAttributes.STATUS)))
             return userEntity.getStatus();
         else if (name.equals(String.valueOf(UserAttributes.MOBILE_PHONE)))
             return userEntity.getMobilePhone();
@@ -172,13 +174,14 @@ public class UserAdapter extends AbstractUserAdapterFederatedStorage {
 
     @Override
     public Map<String, List<String>> getAttributes() {
-        logger.info(" > > > getAttributes");
+//        logger.info(" > > > getAttributes");
 
         Map<String, List<String>> attrs = super.getAttributes();
 
         MultivaluedHashMap<String, String> all = new MultivaluedHashMap<>();
         all.putAll(attrs);
 
+        all.add(String.valueOf(UserAttributes.OLD_USER_ID), String.valueOf(userEntity.getId()));
         all.add(String.valueOf(UserAttributes.STATUS), userEntity.getStatus());
         all.add(String.valueOf(UserAttributes.MOBILE_PHONE), userEntity.getMobilePhone());
         all.add(String.valueOf(UserAttributes.OFFICE_PHONE), userEntity.getOfficePhone());
@@ -188,9 +191,13 @@ public class UserAdapter extends AbstractUserAdapterFederatedStorage {
 
     @Override
     public Stream<String> getAttributeStream(String name) {
-        logger.info(" > > > getAttributeStream");
+//        logger.info(" > > > getAttributeStream");
 
-        if (name.equals(String.valueOf(UserAttributes.STATUS))) {
+        if (name.equals(String.valueOf(UserAttributes.OLD_USER_ID))) {
+            List<String> id = new LinkedList<>();
+            id.add(String.valueOf(userEntity.getId()));
+            return id.stream();
+        } else if (name.equals(String.valueOf(UserAttributes.STATUS))) {
             List<String> status = new LinkedList<>();
             status.add(userEntity.getStatus());
             return status.stream();

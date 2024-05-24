@@ -110,7 +110,6 @@ public class UserEntity {
     }
 
     public void setLastSyncDate(Timestamp lastSyncDate) {
-        System.out.println("lastSyncDate " + lastSyncDate);
         this.lastSyncDate = lastSyncDate;
     }
 
